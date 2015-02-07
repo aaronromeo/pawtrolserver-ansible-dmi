@@ -1,0 +1,9 @@
+---
+projectname: pawtrolserver
+src: "git@github.com:aaronromeo/pawtrolserver.git"
+project_dir: pawtrolserver
+config_files_base: "{{ src_root }}/venv_{{ projectname }}/{{ projectname }}/serverdeploy"
+processes:
+  - "{{ projectname }}"
+  - "{{ projectname }}_celeryd"
+static_dir: "/data/venv_{{ projectname }}/{{ projectname }}/static"

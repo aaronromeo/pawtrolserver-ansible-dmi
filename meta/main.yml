@@ -1,0 +1,9 @@
+---
+dependencies:
+  - { role: common-tier }
+  # Having to explicitly include git-tier is less than ideal, but this gets skipped
+  # for some reason by Ansible as a result of the role conditionals.
+  - { role: git-tier }
+  - { role: django-worker-app-tier, when: host_type == 'workerserver'  }
+  - { role: web-tier, when: host_type == 'webserver' }
+  - { role: python-app-tier }

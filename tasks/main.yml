@@ -1,0 +1,81 @@
+---
+# - name: Copy unified crt to Nginx
+#   assemble: src="{{ config_files_base }}/ssl_cert" dest="/etc/nginx/conf/ssl-unified.crt"
+#   sudo: true
+#   when: host_type == 'webserver'
+#   notify: 
+#     - restart nginx
+
+# - name: Copy over SSL Key
+#   command: "openssl rsa -in {{ config_files_base }}/ssl.key -out /etc/nginx/conf/ssl.key -passin file:{{ config_files_base }}/ssl-pass-phrase"
+#   sudo: true
+#   when: host_type == 'webserver'
+#   notify: 
+#     - restart nginx
+
+# - name: Secure SSL Key
+#   file:
+#     path: /etc/nginx/conf/ssl.key
+#     mode: 0600
+#   sudo: true
+#   when: host_type == 'webserver'
+#   notify: 
+#     - restart nginx
+
+- include: ../../django-web-app-tier/tasks/supervisor-setup.yml
+  when: host_type == 'webserver'
+
+# - name: Copy celery project specific configuration file
+#   command: cp {{ config_files_base }}/celery.conf /etc/supervisor/conf.d/{{ projectname }}_celery.conf
+#   sudo: true
+#   when: host_type == 'workerserver'
+#   notify: 
+#     - stop supervisorctl
+#     - restart supervisor
+#   tags:
+#     - deploy
+
+- include: ../../django-base-app-tier/tasks/tmp-setup.yml
+
+- include: ../../django-base-app-tier/tasks/requirements-setup.yml
+
+- name: Create DB
+  shell: "source {{ config_files_base }}/vars.secure && {{ src_root }}/venv_{{ projectname }}/bin/python {{ src_root }}/venv_{{ projectname }}/{{ projectname }}/{{ projectname }}/manage.py sqlcreate | ssh -o StrictHostKeyChecking=no postgres@dmi-dbserver -p {{ ansible_ssh_port }} 'psql'"
+  when: create == true and host_type == 'webserver'
+  sudo_user: postgres
+  args:
+    executable: "/bin/bash"
+
+- name: Migrate DB
+  shell: "source {{ config_files_base }}/vars.secure && {{ src_root }}/venv_{{ projectname }}/bin/python {{ src_root }}/venv_{{ projectname }}/{{ projectname }}/{{ projectname }}/manage.py migrate --noinput"
+  when: host_type == 'webserver'
+  args:
+    executable: "/bin/bash"
+  tags:
+    - deploy
+
+- name: Create rabbitmq user
+  shell: "source {{ config_files_base }}/vars.secure && rabbitmqctl add_user pawtrolserver `echo $RABBITMQ_BROKER_PASSWORD`"
+  when: create == true and host_type == 'workerserver'
+  sudo: true
+  args:
+    executable: "/bin/bash"
+
+- name: Create rabbitmq virtual host
+  shell: rabbitmqctl add_vhost pawtrolservervhost
+  when: create == true and host_type == 'workerserver'
+  sudo: true
+  args:
+    executable: "/bin/bash"
+
+- name: Create rabbitmq permissions
+  shell: rabbitmqctl set_permissions -p pawtrolservervhost pawtrolserver ".*" ".*" ".*"
+  when: create == true and host_type == 'workerserver'
+  sudo: true
+  args:
+    executable: "/bin/bash"
+
+- include: ../../django-base-app-tier/tasks/static-setup.yml
+
+- include: ../../web-tier/tasks/nginx-disable-offline.yml
+  when: host_type == 'webserver'
