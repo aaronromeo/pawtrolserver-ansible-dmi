@@ -40,11 +40,12 @@
 - include: ../../django-base-app-tier/tasks/requirements-setup.yml
 
 - name: Create DB
-  shell: "source {{ config_files_base }}/vars.secure && {{ src_root }}/venv_{{ projectname }}/bin/python {{ src_root }}/venv_{{ projectname }}/{{ projectname }}/{{ projectname }}/manage.py sqlcreate | ssh -o StrictHostKeyChecking=no postgres@dmi-dbserver -p {{ ansible_ssh_port }} 'psql'"
-  when: create == true and host_type == 'webserver'
-  sudo_user: postgres
+  shell: "source {{ config_files_base }}/vars.secure && {{ src_root }}/venv_{{ projectname }}/bin/python {{ src_root }}/venv_{{ projectname }}/{{ projectname }}/{{ projectname }}/sqlcreate_postgis.py | ssh -o StrictHostKeyChecking=no postgres@dmi-dbserver -p {{ ansible_ssh_port }} 'psql'"
+  when: create and host_type == 'webserver'
   args:
     executable: "/bin/bash"
+  register: command_result
+  failed_when: "'Error' in command_result.stderr"
 
 - name: Migrate DB
   shell: "source {{ config_files_base }}/vars.secure && {{ src_root }}/venv_{{ projectname }}/bin/python {{ src_root }}/venv_{{ projectname }}/{{ projectname }}/{{ projectname }}/manage.py migrate --noinput"
@@ -56,21 +57,21 @@
 
 - name: Create rabbitmq user
   shell: "source {{ config_files_base }}/vars.secure && rabbitmqctl add_user pawtrolserver `echo $RABBITMQ_BROKER_PASSWORD`"
-  when: create == true and host_type == 'workerserver'
+  when: create and host_type == 'workerserver'
   sudo: true
   args:
     executable: "/bin/bash"
 
 - name: Create rabbitmq virtual host
   shell: rabbitmqctl add_vhost pawtrolservervhost
-  when: create == true and host_type == 'workerserver'
+  when: create and host_type == 'workerserver'
   sudo: true
   args:
     executable: "/bin/bash"
 
 - name: Create rabbitmq permissions
   shell: rabbitmqctl set_permissions -p pawtrolservervhost pawtrolserver ".*" ".*" ".*"
-  when: create == true and host_type == 'workerserver'
+  when: create and host_type == 'workerserver'
   sudo: true
   args:
     executable: "/bin/bash"
