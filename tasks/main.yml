@@ -52,8 +52,6 @@
   when: host_type == 'webserver'
   args:
     executable: "/bin/bash"
-  tags:
-    - deploy
 
 - name: Create rabbitmq user
   shell: "source {{ config_files_base }}/vars.secure && rabbitmqctl add_user pawtrolserver `echo $RABBITMQ_BROKER_PASSWORD`"
